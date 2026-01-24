@@ -50,3 +50,106 @@ Key Question:
   “Can this data be directly stored in a relational table?”
 Answer: ❌ No
 Schema instability would break downstream analytics.
+
+# STEP 1 — RAW Ingestion (Naive on Purpose)
+What was done:
+- Pulled data from GitHub Public Events API
+- Stored the response exactly as received
+- No flattening
+- No cleaning
+- No schema enforcement
+- Partitioned by ingestion date
+
+Why this matters:
+- Preserves original data for reprocessing
+- Prevents data loss
+- Mirrors real ingestion systems
+- RAW layer accepts chaos by design.
+
+# STEP 2 — Pain Points Observed
+
+Before optimization, several issues were observed:
+
+- Files grow quickly
+- Highly repetitive fields
+- Nested structures are hard to query
+- Different event types have different payload shapes
+- Schema evolution can silently break analytics
+
+These pains define the problem statement, not failures.
+
+# STEP 3 — Event-Driven Thinking (Mindset Shift)
+
+Instead of thinking in tables, the system was designed around events.
+
+Definition:
+        One event = one JSON object
+
+Event Structure:
+- Core metadata (stable)
+- event_id
+- event_type
+- created_at
+- actor
+- repo
+Payload (event-specific, unstable)
+
+This separation allows schema evolution without breaking pipelines.
+
+# STEP 4 — Spark Ingestion Challenges & Resolutions
+❌ Issue 1: Spark Failed to Read JSON
+
+Reason:
+GitHub API returns JSON as a multi-object array, while Spark expects newline-delimited JSON.
+
+Resolution:
+
+.option("multiLine", "true")
+
+Why this matters:
+
+Real APIs rarely produce analytics-friendly formats.
+
+Issue 2: _corrupt_record Query Error
+
+Spark disallows lazy queries that reference only _corrupt_record.
+
+Resolution:
+
+- Cache the parsed DataFrame
+- Force materialization before inspection
+
+df.cache()
+df.count()
+
+Learning:
+
+Spark enforces schema integrity to avoid misleading results.
+Issue 3: DBFS Disabled
+
+Public DBFS access is restricted in modern Databricks workspaces.
+
+Resolution:
+- Used Unity Catalog Volumes instead
+
+/Volumes/<catalog>/<schema>/<volume>/
+
+Benefit:
+- Better security
+- Production-aligned storage
+- Governance-ready
+
+# STEP 5 — Bronze Layer (Parsed, Not Flattened)
+
+At the Bronze stage:
+
+- JSON is parsed successfully
+- Nested structures are preserved
+- No transformations applied
+- No business logic enforced
+
+This layer ensures:
+
+- Schema stability
+- Reprocessability
+- Observability of malformed data
