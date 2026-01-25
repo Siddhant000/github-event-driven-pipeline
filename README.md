@@ -155,3 +155,5 @@ This layer ensures:
 - Schema stability
 - Reprocessability
 - Observability of malformed data
+
+The Bronze layer is stored using Delta Lake, providing ACID guarantees, schema evolution support, and columnar storage for scalable analytics.
