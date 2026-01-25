@@ -141,6 +141,8 @@ Benefit:
 
 # STEP 5 — Bronze Layer (Parsed, Not Flattened)
 
+Data types are intentionally preserved as inferred from source to prevent schema rigidity and support evolution.
+
 At the Bronze stage:
 
 - JSON is parsed successfully
