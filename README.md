@@ -157,3 +157,57 @@ This layer ensures:
 - Observability of malformed data
 
 The Bronze layer is stored using Delta Lake, providing ACID guarantees, schema evolution support, and columnar storage for scalable analytics.
+
+# 🧱 Data Modeling (Star Schema)
+-  Fact Table
+   Grain: One row per GitHub event
+        
+        fact_github_events:
+        event_id
+        event_type
+        actor_id
+        repo_id
+        event_date
+        ingestion_time
+
+- Dimension Tables
+  
+- DIM_ACTOR:
+  
+        actor_id (PK)
+        actor_login
+        actor_type (User / Bot)
+
+- DIM_REPO:
+  
+        repo_id (PK)
+        repo_name
+        repo_url
+        owner_name
+
+- DIM_EVENT_TYPE
+
+        event_type (PK)
+        category (code / issue / release / CI)
+
+- DIM_DATE
+
+        date_key (DATE)
+        year, quarter, month, week
+        day_name
+        is_weekend
+
+- Design principle:
+
+- FACT uses event_id
+- DIMs use business keys
+- No event_id in dimensions
+
+# Key Learnings
+
+- Delta Lake = Parquet + transaction log
+- ELT scales better for analytics workloads
+- Snowflake prefers pull-based ingestion
+- Dimension grain definition is critical
+- DATE is superior to TIMESTAMP in date dimensions
+- Semi-structured data should stay semi-structured until needed
