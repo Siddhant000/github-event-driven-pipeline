@@ -1,3 +1,4 @@
+
 import requests
 import os
 import json
@@ -33,7 +34,6 @@ from pyspark.sql import SparkSession
 
 spark = SparkSession.builder.appName("GitHub").getOrCreate()
 
-df_raw = spark.read.option('columnNameOfCorruptRecord','_corrupt_record').option("multiline",'true').\
-format("json").load("/Volumes/workspace/default/raw_github_events/date=2026-01-24/events_161916.json")
+df_raw = spark.read.option('columnNameOfCorruptRecord','_corrupt_record').option("multiline",'true').option("mergeSchema", "true").format("json").load("/Volumes/workspace/default/raw_github_events/")
 
 display(df_raw)
