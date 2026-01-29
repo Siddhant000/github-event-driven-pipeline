@@ -37,7 +37,7 @@ GOLD Layer (Analytics-ready tables)
 # STEP 0 — Understand the Data (Before Writing Pipelines)
 Before building pipelines, the API response was inspected manually.
 
-# Observations:
+## Observations:
 
 - Multiple event types (PushEvent, PullRequestEvent, WatchEvent, etc.)
 - Deeply nested JSON structures
@@ -104,7 +104,7 @@ GitHub API returns JSON as a multi-object array, while Spark expects newline-del
 
 Resolution:
 
-.option("multiLine", "true")
+        .option("multiLine", "true")
 
 Why this matters:
 
@@ -119,12 +119,13 @@ Resolution:
 - Cache the parsed DataFrame
 - Force materialization before inspection
 
-df.cache()
-df.count()
+        df.cache()
+        df.count()
 
 Learning:
 
 Spark enforces schema integrity to avoid misleading results.
+
 Issue 3: DBFS Disabled
 
 Public DBFS access is restricted in modern Databricks workspaces.
@@ -132,7 +133,7 @@ Public DBFS access is restricted in modern Databricks workspaces.
 Resolution:
 - Used Unity Catalog Volumes instead
 
-/Volumes/<catalog>/<schema>/<volume>/
+        /Volumes/<catalog>/<schema>/<volume>/
 
 Benefit:
 - Better security
@@ -158,7 +159,186 @@ This layer ensures:
 
 The Bronze layer is stored using Delta Lake, providing ACID guarantees, schema evolution support, and columnar storage for scalable analytics.
 
-# 🧱 Data Modeling (Star Schema)
+# STEP 6 — Load into Snowflake (RAW schema)
+Once the curated SILVER layer was finalized, data was loaded into Snowflake.
+
+Design choices:
+
+- Snowflake used as the analytical warehouse
+- RAW schema accepts semi-structured data
+- No aggressive cleaning at this stage
+- Schema evolution allowed
+
+Why Snowflake:
+
+- Separation of storage and compute
+- Excellent support for semi-structured data
+- Scales independently for concurrent analytic
+- ELT-friendly (transform after loading)
+
+Goal:
+“Prove that growing, messy event data can be ingested safely without breaking.”
+
+# STEP 7 — SILVER to GOLD: Transformation & Optimization
+
+At this stage, the focus shifts from data correctness to data usability.
+
+Guiding questions:
+
+- What will analysts query most?
+- What metrics are repeatedly computed?
+- Which joins are expensive and repetitive?
+- What needs to be fast?
+
+Instead of forcing analysts to work on raw facts, business-ready aggregates were created.
+
+## GOLD Layer — Analytics-Ready Tables
+
+The GOLD layer represents opinionated, purpose-built datasets.
+
+Each table:
+
+- Answers a specific analytical question
+- Avoids complex joins
+- Is dashboard-ready
+- Can scale independently
+
+1. FACT_EVENTS_DAILY
+
+Purpose: Daily activity trend analysis
+
+What it answers:
+
+- How platform activity changes over time
+- Growth or decline patterns
+- Spikes caused by releases or incidents
+
+Why important:
+
+- Time-series analysis is the first question business asks
+- Reduces repeated aggregations on raw events
+
+2. PEAK_ACTIVITY_PER_DAY
+
+Purpose: Identify busiest hours per day
+
+What it answers:
+
+- When users are most active
+- Load patterns across time
+- Optimal scheduling windows
+
+Why important:
+
+- Helps capacity planning
+- Reveals user behavior patterns
+- Useful for alerting and monitoring use cases
+
+3. TOP_ACTIVE_USERS
+
+Purpose: Identify highly engaged contributors
+
+What it answers:
+
+- Who generates the most activity
+- Power users vs casual users
+- Bots vs real users
+
+Design note:
+
+- “Active” is inferred from event presence, not a status flag
+- In event-driven systems, activity = event creation
+
+Why important:
+
+- Engagement metrics are core business KPIs
+- No explicit “active/inactive” column exists in raw data
+
+4. USER_RETENTION
+
+Purpose: Measure repeated user participation across days
+
+What it answers:
+
+- Do users come back?
+- Are contributors one-time or recurring?
+- Community stickiness
+
+Why important:
+
+- Retention is more meaningful than raw activity
+- Distinguishes viral spikes from healthy ecosystems
+
+5. EVENT_PER_REPO
+
+Purpose: Repository popularity & usage patterns
+
+What it answers:
+
+- Which repositories attract activity
+- What types of events dominate per repo
+- Code vs issue vs CI behavior
+
+Why important:
+
+- Helps prioritize repositories
+- Enables repo-level comparisons
+
+6. REPO_ACTIVITY_CONCENTRATION
+
+Purpose: Community health analysis
+
+Logic:
+
+- Compare total events vs unique contributors
+- Detect whether activity is:
+- Concentrated among few users
+- Spread across many contributors
+
+Interpretation:
+
+- High concentration → Risky dependency on few users
+- Healthy community → Balanced contribution
+- Inactive → Low engagement
+
+Why important:
+
+- Raw counts hide participation imbalance
+- This metric adds qualitative insight, not just volume
+
+# STEP 8 — Growth-Aware Design Decisions
+
+Several design decisions were made anticipating scale:
+
+- Event-based grain avoids duplication
+- Dimensions decouple slowly changing attributes
+- GOLD tables reduce compute-heavy queries
+- Semi-structured fields preserved until necessary
+- Ingestion time stored separately from event time
+
+Key realization:
+Growth breaks rigid schemas, not flexible ones.
+
+# STEP 9 — Analytics Readiness (Without BI Lock-in)
+
+The GOLD layer is:
+
+- Tool-agnostic
+- Queryable directly in SQL
+- Compatible with Power BI, Tableau, Looker
+- Dashboards can be built without modifying pipelines.
+
+
+# Final Key Takeaways
+
+- Event-driven thinking simplifies schema evolution
+- RAW ≠ useless; it is insurance
+- Bronze is about correctness, not beauty
+- Silver defines the contract
+- Gold defines business truth
+- Metrics are opinions — document them
+
+# Data Modeling (Star Schema)
 -  Fact Table
    Grain: One row per GitHub event
         
